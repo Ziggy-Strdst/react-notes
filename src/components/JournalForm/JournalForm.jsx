@@ -1,45 +1,53 @@
-import { useState } from 'react';
+import { useEffect, useReducer } from 'react';
 import Button from '../Button/Button';
 import styles from './JournalForm.module.css';
+import { INITIAL_STATE, formReducer } from './JournalForm.state';
 
 function JournalForm({ onAddItem }) {
-  const [validState, setValidState] = useState({
-    title: true,
-    text: true,
-  });
-  let isValid = true;
+  const [formState, dispatchForm] = useReducer(formReducer, INITIAL_STATE);
+  const { isValid, values, isFormReadyToSubmit } = formState;
+
+  useEffect(() => {
+    let timerId;
+    if (!isValid.title || !isValid.text) {
+      timerId = setTimeout(() => {
+        dispatchForm({ type: 'RESET_VALIDITY' });
+      }, 2000);
+    }
+    return () => {
+      clearTimeout(timerId);
+    };
+  }, [isValid]);
+
+  useEffect(() => {
+    if (isFormReadyToSubmit) {
+      onAddItem(values);
+      dispatchForm({ type: 'CLEAR' });
+    }
+  }, [isFormReadyToSubmit, values, onAddItem]);
+
   const addJournalItem = (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
-    const formProps = Object.fromEntries(formData);
-
-    if (!formProps.title?.trim().length) {
-      setValidState((state) => ({ ...state, title: false }));
-      isValid = false;
-    } else {
-      setValidState((state) => ({ ...state, title: true }));
-      isValid = true;
-    }
-    if (!formProps.text?.trim().length) {
-      setValidState((state) => ({ ...state, text: false }));
-      isValid = false;
-    } else {
-      setValidState((state) => ({ ...state, text: true }));
-      isValid = true;
-    }
-
-    if (!isValid) return;
-
-    onAddItem(formProps);
+    dispatchForm({ type: 'SUBMIT' });
   };
+
+  const onChange = (e) => {
+    dispatchForm({
+      type: 'SET_VALUE',
+      payload: { [e.target.name]: e.target.value },
+    });
+  };
+
   return (
     <form className={styles['journal-form']} onSubmit={addJournalItem}>
       <div>
         <input
           type='text'
+          value={values.title}
+          onChange={onChange}
           name='title'
           className={`${styles['input-title']} ${
-            validState.title ? '' : styles['invalid']
+            isValid.title ? '' : styles['invalid']
           }`}
         />
       </div>
@@ -59,12 +67,14 @@ function JournalForm({ onAddItem }) {
       </div>
 
       <textarea
+        value={values.text}
+        onChange={onChange}
         name='text'
-        id=''
+        id='text'
         cols='30'
         rows='10'
         className={`${styles['input']} ${
-          validState.text ? '' : styles['invalid']
+          isValid.text ? '' : styles['invalid']
         }`}
       ></textarea>
       <Button text='Сохранить' />
