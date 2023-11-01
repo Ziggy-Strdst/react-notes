@@ -1,15 +1,38 @@
-import { useEffect, useReducer } from 'react';
+import { useContext, useEffect, useReducer, useRef } from 'react';
 import Button from '../Button/Button';
 import styles from './JournalForm.module.css';
 import { INITIAL_STATE, formReducer } from './JournalForm.state';
+import { UserContext } from '../../context/user.context';
 
-function JournalForm({ onAddItem }) {
+function JournalForm({ onAddItem, data, onDelete }) {
   const [formState, dispatchForm] = useReducer(formReducer, INITIAL_STATE);
   const { isValid, values, isFormReadyToSubmit } = formState;
+  const titleRef = useRef();
+  const textRef = useRef();
+  const { userId } = useContext(UserContext);
+
+  const focusValid = () => {
+    switch (true) {
+      case !isValid.title:
+        titleRef.current.focus();
+        break;
+      case !isValid.text:
+        textRef.current.focus();
+        break;
+    }
+  };
+
+  useEffect(() => {
+    dispatchForm({
+      type: 'SET_VALUE',
+      payload: { ...data },
+    });
+  }, [data]);
 
   useEffect(() => {
     let timerId;
     if (!isValid.title || !isValid.text) {
+      focusValid(isValid);
       timerId = setTimeout(() => {
         dispatchForm({ type: 'RESET_VALIDITY' });
       }, 2000);
@@ -23,13 +46,24 @@ function JournalForm({ onAddItem }) {
     if (isFormReadyToSubmit) {
       onAddItem(values);
       dispatchForm({ type: 'CLEAR' });
+      dispatchForm({
+        type: 'SET_VALUE',
+        payload: { userId },
+      });
     }
-  }, [isFormReadyToSubmit, values, onAddItem]);
+  }, [isFormReadyToSubmit, values, onAddItem, userId]);
 
   const addJournalItem = (e) => {
     e.preventDefault();
     dispatchForm({ type: 'SUBMIT' });
   };
+
+  useEffect(() => {
+    dispatchForm({
+      type: 'SET_VALUE',
+      payload: { userId },
+    });
+  }, [userId]);
 
   const onChange = (e) => {
     dispatchForm({
@@ -38,18 +72,37 @@ function JournalForm({ onAddItem }) {
     });
   };
 
+  const deleteJournalItem = () => {
+    onDelete(data.id);
+    dispatchForm({ type: 'CLEAR' });
+    dispatchForm({
+      type: 'SET_VALUE',
+      payload: { userId },
+    });
+  };
+
   return (
     <form className={styles['journal-form']} onSubmit={addJournalItem}>
-      <div>
+      <div className={styles['form-row']}>
         <input
           type='text'
-          value={values.title}
+          ref={titleRef}
           onChange={onChange}
+          value={values.title}
           name='title'
           className={`${styles['input-title']} ${
             isValid.title ? '' : styles['invalid']
           }`}
         />
+        {data.id && (
+          <button
+            className={styles.delete}
+            type='button'
+            onClick={() => deleteJournalItem()}
+          >
+            <img src='/archive-round.svg' alt='Кнопка удалить' />
+          </button>
+        )}
       </div>
       <div className={styles['form-row']}>
         <label className={styles['form-label']} htmlFor='date'>
@@ -67,8 +120,9 @@ function JournalForm({ onAddItem }) {
       </div>
 
       <textarea
-        value={values.text}
+        ref={textRef}
         onChange={onChange}
+        value={values.text}
         name='text'
         id='text'
         cols='30'
